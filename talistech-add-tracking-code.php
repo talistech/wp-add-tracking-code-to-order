@@ -2,7 +2,7 @@
 /*
 Plugin Name: Talistech - Add Tracking Code
 Description: Add custom fields to the WooCommerce Edit Order page and send a custom email notification.
-Version: 1.2
+Version: 1.4
 Author: Talistech.com
 */
 
@@ -17,10 +17,9 @@ function custom_add_order_fields() {
         $transporteur = get_post_meta($order_id, '_transporteur', true);
         $tracking_link = get_post_meta($order_id, '_tracking_link', true);
 
-        echo '<div class="order_data_column" style="width:100%;">';
         woocommerce_wp_select(
             array(
-                'id' => '_transporteur',
+                'id'    => '_transporteur',
                 'label' => __('Transporteur', 'woocommerce'),
                 'options' => array(
                     'Bpost' => __('Bpost', 'woocommerce'),
@@ -32,19 +31,42 @@ function custom_add_order_fields() {
                     'UPS' => __('UPS', 'woocommerce'),
                     'Modial Relay' => __('Modial Relay', 'woocommerce'),
                     'TNT' => __('TNT', 'woocommerce'),
+                    'Klaar om opgehaald te worden' => __('Klaar om opgehaald te worden', 'woocommerce'), // New transporteur
                 ),
                 'value' => $transporteur,
+                'class' => 'form-field-wide', // Add the 'form-field-wide' class
             )
         );
+
+        // Add JavaScript to disable tracking_code when 'Klaar om opgehaald te worden' is selected
+        echo '<script>
+            jQuery(function($){
+                $(\'#_transporteur\').change(function(){
+                    var selectedTransporteur = $(this).val();
+                    var trackingCodeField = $(\'#_tracking_link\');
+
+                    if(selectedTransporteur === \'Klaar om opgehaald te worden\') {
+                        trackingCodeField.prop(\'disabled\', true);
+                    } else {
+                        trackingCodeField.prop(\'disabled\', false);
+                    }
+                });
+
+                // Trigger change event on page load
+                $(\'#_transporteur\').change();
+            });
+        </script>';
+
         woocommerce_wp_text_input(
             array(
-                'id' => '_tracking_link',
-                'label' => __('Tracking Link', 'woocommerce'),
+                'id'          => '_tracking_link',
+                'label'       => __('Tracking Link', 'woocommerce'),
                 'placeholder' => __('Enter tracking link', 'woocommerce'),
-                'value' => $tracking_link,
+                'value'       => $tracking_link,
+                'class'       => 'form-field-wide', // Add the 'form-field-wide' class
             )
         );
-        echo '</div>';
+
     }
 }
 add_action('woocommerce_admin_order_data_after_order_details', 'custom_add_order_fields');
@@ -65,6 +87,9 @@ function custom_save_order_fields($order_id) {
         (empty($existing_tracking_link) && !empty($tracking_link)) ||
         ($existing_tracking_link !== $tracking_link)
     );
+
+    // Additional condition to check if the transporteur was switched to "Klaar om opgehaald te worden"
+    $switched_to_klaar = ($existing_transporteur !== 'Klaar om opgehaald te worden') && ($transporteur === 'Klaar om opgehaald te worden');
 
     error_log('Transporteur: ' . $transporteur);
     error_log('Tracking Link: ' . $tracking_link);
@@ -96,5 +121,33 @@ function custom_save_order_fields($order_id) {
             $headers
         );
     }
+
+    // Send additional email for "Klaar om opgehaald te worden"
+    if ($switched_to_klaar) {
+        $order = wc_get_order($order_id);
+        $shopname = get_bloginfo('name');
+        $subject_klaar = __('Je ' . $shopname . ' pakketje ligt klaar om opgehaald te worden!', 'woocommerce');
+
+        // Format the message using HTML
+        $message_klaar = sprintf(
+            __(
+                'Goed nieuws! We hebben je pakketje zorgvuldig klaargemaakt en het ligt klaar om opgehaald te worden. Houd onze openingsuren goed in de gaten alvorens je bij ons op bezoek komt. Tot dan!',
+                'woocommerce'
+            )
+        );
+
+        // Indicate that the email content is HTML
+        $headers_klaar = array('Content-Type: text/html; charset=UTF-8');
+
+        // Send HTML email for "Klaar om opgehaald te worden"
+        wc_mail(
+            $order->get_billing_email(),
+            $subject_klaar,
+            $message_klaar,
+            '',
+            $headers_klaar
+        );
+    }
 }
 add_action('woocommerce_process_shop_order_meta', 'custom_save_order_fields', 10, 1);
+?>
