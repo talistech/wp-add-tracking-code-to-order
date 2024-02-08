@@ -2,7 +2,7 @@
 /*
 Plugin Name: Talistech - Add Tracking Code
 Description: Add custom fields to the WooCommerce Edit Order page and send a custom email notification.
-Version: 1.4
+Version: 1.5
 Author: Talistech.com
 */
 
@@ -83,7 +83,7 @@ function custom_save_order_fields($order_id) {
     update_post_meta($order_id, '_tracking_link', $tracking_link);
 
     $should_send_email = (
-        (empty($existing_transporteur) && !empty($transporteur)) ||
+        (empty($existing_transporteur) && !empty($transporteur) && !empty($tracking_link)) ||
         (empty($existing_tracking_link) && !empty($tracking_link)) ||
         ($existing_tracking_link !== $tracking_link)
     );
